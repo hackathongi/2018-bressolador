@@ -134,13 +134,31 @@ void loop(void)
         Serial.println(F("Invalid response"));
         return;
       }
+
+/*      
+   Serial.println(F("START - PARSING RESPONSE"));  
+   String json = "";
+   while (client.available() > 0) 
+   {
+        char c = client.read();
+        json += c;
+   }
+   
+   Serial.println(F("END - PARSING RESPONSE"));
+   json.replace("\"id\":\"bressol\",", "");
+   Serial.println(json);
+   Serial.println(F("2 - END - PARSING RESPONSE"));
+
+*/
     
       // Allocate JsonBuffer
       // Use arduinojson.org/assistant to compute the capacity.
-      const size_t capacity = JSON_OBJECT_SIZE(1) + JSON_OBJECT_SIZE(8) + 60;
+      
+      const size_t capacity = JSON_ARRAY_SIZE(1) + JSON_OBJECT_SIZE(0) + JSON_OBJECT_SIZE(2) + 2*JSON_OBJECT_SIZE(3) + 102*2;
       
       DynamicJsonBuffer jsonBuffer(capacity);
-    
+
+      
       // Parse JSON object
       JsonObject& root = jsonBuffer.parseObject(client);
       if (!root.success()) {
@@ -150,13 +168,12 @@ void loop(void)
     
       // Extract values
       Serial.println(F("Response:"));
-      Serial.println(root["version"].as<char*>());
-      Serial.println(root["orion"]["version"].as<char*>());
+      Serial.println(root["subscriptionId"].as<char*>());
+      //Serial.println(root["data"]["estat"]["value"].as<char*>());
       
       Serial.println();
       Serial.println("closing connection");      
       
-      Serial.println(F("Processing request"));
       if (strcmp(action, "POST") == 0) {
         client.fastrprintln(F("HTTP/1.1 200 OK"));
         client.fastrprintln(F("Content-Type: text/plain"));
