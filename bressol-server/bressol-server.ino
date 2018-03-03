@@ -73,6 +73,15 @@ void prepareServer()
     Serial.println(F("Couldn't begin()! Check your wiring?"));
     while(1);
   }
+
+  uint32_t ipAddress = cc3000.IP2U32(192, 168, 4, 28);
+  uint32_t netMask = cc3000.IP2U32(255, 255, 255, 0);
+  uint32_t defaultGateway = cc3000.IP2U32(192, 168, 4, 254);
+  uint32_t dns = cc3000.IP2U32(8, 8, 4, 4);
+  if (!cc3000.setStaticIPAddress(ipAddress, netMask, defaultGateway, dns)) {
+    Serial.println(F("Failed to set static IP!"));
+    while(1);
+  }
   
   Serial.print(F("\nAttempting to connect to ")); Serial.println(WLAN_SSID);
   if (!cc3000.connectToAP(WLAN_SSID, WLAN_PASS, WLAN_SECURITY)) {
@@ -82,11 +91,13 @@ void prepareServer()
    
   Serial.println(F("Connected!"));
 
+/*
   Serial.println(F("Request DHCP"));
   while (!cc3000.checkDHCP())
   {
     delay(100); // ToDo: Insert a DHCP timeout!
   }  
+*/
 
   // Display the IP address DNS, Gateway, etc.
   while (! displayConnectionDetails()) {
@@ -117,10 +128,9 @@ void setup(void)
 
 void loop(void)
 {
-  moveCrib();
-  delay(1000);
+//  moveCrib();
+//  delay(1000);
   
-  /*
   // Try to get a client which is connected.
   Adafruit_CC3000_ClientRef client = httpServer.available();
   if (client) {
@@ -205,7 +215,6 @@ void loop(void)
     Serial.println(F("Client disconnected"));
     client.close();
   }
-  */
 }
 
 // Return true if the buffer contains an HTTP request.  Also returns the request
