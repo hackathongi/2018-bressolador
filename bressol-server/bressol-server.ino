@@ -2,9 +2,6 @@
 
 #include <Servo.h>
 #include <Adafruit_CC3000.h>
-#include <SPI.h>
-#include "utility/debug.h"
-#include "utility/socket.h"
 #include <ArduinoJson.h>
 
 // These are the interrupt and control pins
@@ -23,23 +20,11 @@ Adafruit_CC3000 cc3000 = Adafruit_CC3000(ADAFRUIT_CC3000_CS, ADAFRUIT_CC3000_IRQ
 // Security can be WLAN_SEC_UNSEC, WLAN_SEC_WEP, WLAN_SEC_WPA or WLAN_SEC_WPA2
 #define WLAN_SECURITY   WLAN_SEC_WPA2
 
-#define LISTEN_PORT           80      // What TCP port to listen on for connections.  
-                                      // The HTTP protocol uses port 80 by default.
-
-#define MAX_ACTION            10      // Maximum length of the HTTP action that can be parsed.
-
-#define MAX_PATH              64      // Maximum length of the HTTP request path that can be parsed.
-                                      // There isn't much memory available so keep this short!
-
-#define BUFFER_SIZE           MAX_ACTION + MAX_PATH + 20  // Size of buffer for incoming request data.
-                                                          // Since only the first line is parsed this
-                                                          // needs to be as large as the maximum action
-                                                          // and path plus a little for whitespace and
-                                                          // HTTP version.
-
-#define TIMEOUT_MS            500    // Amount of time in milliseconds to wait for
-                                     // an incoming request to finish.  Don't set this
-                                     // too high or your server could be slow to respond.
+#define LISTEN_PORT           80
+#define MAX_ACTION            10
+#define MAX_PATH              64
+#define BUFFER_SIZE           MAX_ACTION + MAX_PATH + 20
+#define TIMEOUT_MS            500    
 
 Adafruit_CC3000_Server httpServer(LISTEN_PORT);
 uint8_t buffer[BUFFER_SIZE+1];
@@ -49,25 +34,35 @@ char path[MAX_PATH+1];
 
 Servo myServo;  // create a servo object
 
+int availableMemory() {
+  int size = 1024; // Use 2048 with ATmega328
+  byte *buf;
+
+  while ((buf = (byte *) malloc(--size)) == NULL)
+    ;
+
+  free(buf);
+
+  return size;
+}
+
 void moveCrib()
 {
   myServo.attach(9); // attaches the servo on pin 9 to the servo object
-
-  for (int i = 0; i < 1; i++)
+  for (int i = 0; i < 5; i++)
   {
     myServo.write(0);
-    Serial.println("angle: 0");
-    delay(10000);
+    Serial.println(F("angle: 0"));
+    delay(3000);
     myServo.write(180);
-    Serial.println("angle: 180");
-    delay(10000);
+    Serial.println(F("angle: 180"));
+    delay(3000);
   }
   myServo.detach();
 }
 
 void prepareServer()
 {
-  Serial.println(F("\nInitializing..."));
   if (!cc3000.begin())
   {
     Serial.println(F("Couldn't begin()! Check your wiring?"));
@@ -75,7 +70,7 @@ void prepareServer()
   }
 
   uint32_t ipAddress = cc3000.IP2U32(192, 168, 4, 28);
-  uint32_t netMask = cc3000.IP2U32(255, 255, 255, 0);
+  uint32_t netMask = cc3000.IP2U32(255, 255, 0, 0);
   uint32_t defaultGateway = cc3000.IP2U32(192, 168, 4, 254);
   uint32_t dns = cc3000.IP2U32(8, 8, 4, 4);
   if (!cc3000.setStaticIPAddress(ipAddress, netMask, defaultGateway, dns)) {
@@ -89,8 +84,6 @@ void prepareServer()
     while(1);
   }
    
-  Serial.println(F("Connected!"));
-
 /*
   Serial.println(F("Request DHCP"));
   while (!cc3000.checkDHCP())
@@ -103,34 +96,20 @@ void prepareServer()
   while (! displayConnectionDetails()) {
     delay(1000);
   }
-
-  // ******************************************************
-  // You can safely remove this to save some flash memory!
-  // ******************************************************
-  Serial.println(F("\r\nNOTE: This sketch may cause problems with other sketches"));
-  Serial.println(F("since the .disconnect() function is never called, so the"));
-  Serial.println(F("AP may refuse connection requests from the CC3000 until a"));
-  Serial.println(F("timeout period passes.  This is normal behaviour since"));
-  Serial.println(F("there isn't an obvious moment to disconnect with a server.\r\n"));
   
   // Start listening for connections
   httpServer.begin();
-  
-  Serial.println(F("Listening for connections..."));
+  Serial.println(F("Connected! Listening for connections..."));
 }
 
 void setup(void)
 {
   Serial.begin(115200);
-
   prepareServer();
 }
 
 void loop(void)
 {
-//  moveCrib();
-//  delay(1000);
-  
   // Try to get a client which is connected.
   Adafruit_CC3000_ClientRef client = httpServer.available();
   if (client) {
@@ -169,10 +148,9 @@ void loop(void)
       // Allocate JsonBuffer
       // Use arduinojson.org/assistant to compute the capacity.
       
-      const size_t capacity = JSON_ARRAY_SIZE(1) + JSON_OBJECT_SIZE(0) + JSON_OBJECT_SIZE(2) + 2*JSON_OBJECT_SIZE(3) + 102*2;
+      const size_t capacity = JSON_ARRAY_SIZE(1) + JSON_OBJECT_SIZE(0) + JSON_OBJECT_SIZE(2) + 2*JSON_OBJECT_SIZE(3) + 128;
       
       DynamicJsonBuffer jsonBuffer(capacity);
-
       
       // Parse JSON object
       JsonObject& root = jsonBuffer.parseObject(client);
@@ -182,29 +160,47 @@ void loop(void)
       }
     
       // Extract values
-      Serial.println(F("Response:"));
-      Serial.println(root["subscriptionId"].as<char*>());
-      //Serial.println(root["data"]["estat"]["value"].as<char*>());
+      Serial.println(availableMemory());
+      const char* value = root["data"][0]["estat"]["value"];
+      if (strcmp(value, "on") == 0)
+      {
+        Serial.println(F("Moving crib"));
+        moveCrib();
+        Serial.println(F("End moving crib"));
+      }
+      else
+        Serial.println(F("Not moving"));
+        
+      //Serial.println(root["data"][0]["estat"]["value"].as<char*>());
       
-      Serial.println();
-      Serial.println("closing connection");      
+      //Serial.println();
+      //Serial.println("closing connection");      
       
       if (strcmp(action, "POST") == 0) {
+        Serial.println(F("Entra a POST"));
         client.fastrprintln(F("HTTP/1.1 200 OK"));
+        Serial.println(F("Entra a POST 1"));
         client.fastrprintln(F("Content-Type: text/plain"));
+        Serial.println(F("Entra a POST 2"));
         client.fastrprintln(F("Connection: close"));
         client.fastrprintln(F("Server: Adafruit CC3000"));
         client.fastrprintln(F(""));
+        Serial.println(F("DINS a POST"));
 
         // Now send the response data.
         client.fastrprintln(F("Hello world!"));
         client.fastrprint(F("You accessed path: ")); client.fastrprintln(path);
       }
       else {
+                Serial.println(F("Entra a ELSE POST"));
+
         // Unsupported action, respond with an HTTP 405 method not allowed error.
         client.fastrprintln(F("HTTP/1.1 405 Method Not Allowed"));
         client.fastrprintln(F(""));
       }
+
+              Serial.println(F("FINAL"));
+
     }
 
     // Wait a short period to make sure the response had time to send before
@@ -267,10 +263,6 @@ bool displayConnectionDetails(void)
   else
   {
     Serial.print(F("\nIP Addr: ")); cc3000.printIPdotsRev(ipAddress);
-    Serial.print(F("\nNetmask: ")); cc3000.printIPdotsRev(netmask);
-    Serial.print(F("\nGateway: ")); cc3000.printIPdotsRev(gateway);
-    Serial.print(F("\nDHCPsrv: ")); cc3000.printIPdotsRev(dhcpserv);
-    Serial.print(F("\nDNSserv: ")); cc3000.printIPdotsRev(dnsserv);
     Serial.println();
     return true;
   }
