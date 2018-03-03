@@ -1,5 +1,6 @@
 
 
+#include <Servo.h>
 #include <Adafruit_CC3000.h>
 #include <SPI.h>
 #include "utility/debug.h"
@@ -46,23 +47,32 @@ int bufindex = 0;
 char action[MAX_ACTION+1];
 char path[MAX_PATH+1];
 
-void setup(void)
+Servo myServo;  // create a servo object
+
+void moveCrib()
 {
-  Serial.begin(115200);
+  myServo.attach(9); // attaches the servo on pin 9 to the servo object
 
-  Serial.println(F("Hello, CC3000!\n")); 
+  for (int i = 0; i < 1; i++)
+  {
+    myServo.write(0);
+    Serial.println("angle: 0");
+    delay(10000);
+    myServo.write(180);
+    Serial.println("angle: 180");
+    delay(10000);
+  }
+  myServo.detach();
+}
 
-  Serial.print("Free RAM: "); Serial.println(getFreeRam(), DEC);
-  
+void prepareServer()
+{
   Serial.println(F("\nInitializing..."));
   if (!cc3000.begin())
   {
     Serial.println(F("Couldn't begin()! Check your wiring?"));
     while(1);
   }
-  
-  // Optional SSID scan
-  // listSSIDResults();
   
   Serial.print(F("\nAttempting to connect to ")); Serial.println(WLAN_SSID);
   if (!cc3000.connectToAP(WLAN_SSID, WLAN_PASS, WLAN_SECURITY)) {
@@ -98,8 +108,19 @@ void setup(void)
   Serial.println(F("Listening for connections..."));
 }
 
+void setup(void)
+{
+  Serial.begin(115200);
+
+  prepareServer();
+}
+
 void loop(void)
 {
+  moveCrib();
+  delay(1000);
+  
+  /*
   // Try to get a client which is connected.
   Adafruit_CC3000_ClientRef client = httpServer.available();
   if (client) {
@@ -135,22 +156,6 @@ void loop(void)
         return;
       }
 
-/*      
-   Serial.println(F("START - PARSING RESPONSE"));  
-   String json = "";
-   while (client.available() > 0) 
-   {
-        char c = client.read();
-        json += c;
-   }
-   
-   Serial.println(F("END - PARSING RESPONSE"));
-   json.replace("\"id\":\"bressol\",", "");
-   Serial.println(json);
-   Serial.println(F("2 - END - PARSING RESPONSE"));
-
-*/
-    
       // Allocate JsonBuffer
       // Use arduinojson.org/assistant to compute the capacity.
       
@@ -200,6 +205,7 @@ void loop(void)
     Serial.println(F("Client disconnected"));
     client.close();
   }
+  */
 }
 
 // Return true if the buffer contains an HTTP request.  Also returns the request
